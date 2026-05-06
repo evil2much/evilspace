@@ -1,0 +1,26 @@
+name: Auto Sync MoonTVPlus (每6小时检查)
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # 每 6 小时检查一次更新（最安全）
+  workflow_dispatch:       # 允许你手动点击运行
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: 同步上游最新代码
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
+        with:
+          upstream_sync_repo: mtvpls/MoonTVPlus
+          upstream_sync_branch: main
+          target_sync_branch: main
+          test_mode: false
+          allow_ff_only: true
