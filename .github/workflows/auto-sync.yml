@@ -1,4 +1,4 @@
-name: Auto Sync Upstream
+name: Auto Sync MoonTVPlus 每6小时自动同步
 
 on:
   schedule:
