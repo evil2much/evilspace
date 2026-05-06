@@ -1,0 +1,29 @@
+name: Auto Sync Upstream
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # 每 6 小时巡检一次
+  workflow_dispatch:       # 允许手动触发
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sync Upstream
+        uses: repo-sync/pull-request@v2
+        with:
+          source_repository: 原作者用户名/MoonTVPlus
+          source_branch: main
+          destination_branch: main
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pr_label: auto-sync
+          pr_title: "🔄 Auto Sync Upstream"
+          pr_body: "Auto sync from upstream, only merge when no conflicts."
+          merge_method: merge
+          auto_merge: true
