@@ -2,8 +2,8 @@ name: Auto Sync MoonTVPlus 每6小时自动同步
 
 on:
   schedule:
-    - cron: '0 */6 * * *'
-  workflow_dispatch:
+    - cron: '0 */6 * * *'  # 每6小时检查一次
+  workflow_dispatch:       # 支持手动触发
 
 jobs:
   sync:
@@ -16,15 +16,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      # 自动同步上游最新代码
       - name: Sync Upstream Repository
         uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
         with:
           upstream_sync_repo: mtvpls/MoonTVPlus
-          upstream_branch: main
-          target_branch: main
+          upstream_sync_branch: main
+          target_sync_branch: main
           test_mode: false
-          allow_ff_only: true
 
+      # 同步成功 → 自动触发 Vercel 重新部署
       - name: Auto Trigger Vercel Deploy
         if: success()
         run: |
