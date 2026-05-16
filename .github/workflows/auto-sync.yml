@@ -2,28 +2,30 @@ name: Auto Sync MoonTVPlus 每6小时自动同步
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # 每 6 小时巡检一次
-  workflow_dispatch:       # 允许手动触发
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sync Upstream
-        uses: repo-sync/pull-request@v2
+      - name: Sync Upstream Repository
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
         with:
-          source_repository: 原作者用户名/MoonTVPlus
-          source_branch: main
-          destination_branch: main
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          pr_label: auto-sync
-          pr_title: "🔄 Auto Sync Upstream"
-          pr_body: "Auto sync from upstream, only merge when no conflicts."
-          merge_method: merge
-          auto_merge: true
+          upstream_sync_repo: mtvpls/MoonTVPlus
+          upstream_branch: main
+          target_branch: main
+          test_mode: false
+          allow_ff_only: true
+
+      - name: Auto Trigger Vercel Deploy
+        if: success()
+        run: |
+          curl -X POST "https://api.vercel.com/v1/integrations/deploy/prj_qvkM9wqMZ3yjqodv2hZnoiqsqAJd/Ax6VpFiTwJ"
