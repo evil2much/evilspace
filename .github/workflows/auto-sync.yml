@@ -20,13 +20,18 @@ jobs:
         run: |
           git config user.name "AutoSyncBot"
           git config user.email "noreply@github.com"
-      - name: Sync upstream to backup branch
+      - name: Sync upstream to backup branch, remove workflow files
         run: |
           git remote add upstream https://github.com/mtvpls/MoonTVPlus.git || true
           git fetch upstream main
-          git branch -f backup upstream/main
-          # 关键：删掉上游仓库带过来的 .github/workflows，避免推送workflow文件触发保护报错
+          # 基于上游main新建backup分支
+          git checkout -b backup upstream/main
+          # 删除上游带来的github workflow目录
           rm -rf .github/workflows
+          # 生成新commit，把删除操作写入提交记录
+          git add .
+          git commit -m "remove upstream workflow files to bypass github app restriction"
+          # 强制推送
           git push origin backup --force
       - name: Checkout backup branch for build
         run: git checkout backup
