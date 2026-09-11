@@ -24,14 +24,10 @@ jobs:
         run: |
           git remote add upstream https://github.com/mtvpls/MoonTVPlus.git || true
           git fetch upstream main
-          # 基于上游main新建backup分支
           git checkout -b backup upstream/main
-          # 删除上游带来的github workflow目录
           rm -rf .github/workflows
-          # 生成新commit，把删除操作写入提交记录
           git add .
           git commit -m "remove upstream workflow files to bypass github app restriction"
-          # 强制推送
           git push origin backup --force
       - name: Checkout backup branch for build
         run: git checkout backup
@@ -39,6 +35,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'pnpm'
       - name: Install pnpm 10.14.0
         run: |
           corepack enable
@@ -56,7 +53,7 @@ jobs:
         run: |
           for i in {1..3}; do
             echo "===== Deployment attempt $i / 3 ====="
-            vercel deploy --prod --token $VERCEL_TOKEN --org $VERCEL_ORG_ID --project $VERCEL_PROJECT_ID
+            vercel deploy --prod --token $VERCEL_TOKEN --project $VERCEL_PROJECT_ID
             if [ $? -eq 0 ]; then
               echo "✅ Deploy success"
               exit 0
