@@ -4,8 +4,9 @@ on:
     - cron: '0 */6 * * *'
   workflow_dispatch:
 
-permissions: write
+permissions:
   contents: write
+  workflows: write
 
 env:
   VERCEL_ORG_ID: "evil2muchs-projects"
