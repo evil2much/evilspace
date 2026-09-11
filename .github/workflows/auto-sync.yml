@@ -1,53 +1,79 @@
 name: Auto Sync MoonTVPlus
+# 触发规则：每6小时自动执行，同时支持页面手动点击运行
 on:
   schedule:
     - cron: '0 */6 * * *'
   workflow_dispatch:
+
+# 权限：仅授予仓库读写，无多余权限
 permissions:
   contents: write
+
+# 全局环境变量
 env:
   VERCEL_ORG_ID: "evil2muchs-projects"
   VERCEL_PROJECT_ID: "team_bkCwm9PFBwL3IgSHjY5oid7Z"
+
 jobs:
   sync-and-deploy:
     runs-on: ubuntu-latest
     steps:
+      # 拉取你evilspace仓库完整代码
       - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      # 设置git提交用户信息
       - name: Configure git
         run: |
           git config user.name "AutoSyncBot"
           git config user.email "noreply@github.com"
-      - name: Sync upstream to backup branch, remove workflow files
+
+      # 核心同步步骤：拉取上游MoonTVPlus，删除上游workflow目录，推送backup分支
+      - name: Sync upstream & strip workflow files
         run: |
           git remote add upstream https://github.com/mtvpls/MoonTVPlus.git || true
           git fetch upstream main
+          # 基于上游main新建backup分支
           git checkout -b backup upstream/main
+          # 删除上游仓库自带的github workflow，规避Github推送保护拦截
           rm -rf .github/workflows
+          # 将删除操作写入新git提交（关键：不能只删本地文件，必须生成新commit）
           git add .
-          git commit -m "remove upstream workflow files to bypass github app restriction"
+          git commit -m "remove upstream workflow files to bypass github protection"
+          # 强制推送到远端backup分支
           git push origin backup --force
-      - name: Checkout backup branch for build
+
+      # 切换到backup分支，准备构建
+      - name: Checkout backup
         run: git checkout backup
-      - name: Setup Node.js 22
+
+      # 安装Node 22，开启pnpm缓存，加速后续运行
+      - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
+
+      # 使用pnpm官方action安装指定版本pnpm，自动处理PATH环境变量
       - name: Install pnpm 10.14.0
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.14.0 --activate
-          pnpm --version
-      - name: Install dependencies & build
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.14.0
+
+      # 安装依赖并执行项目构建
+      - name: Install deps & build
         run: |
           pnpm install --frozen-lockfile
           pnpm build
-      - name: Install vercel cli
+
+      # 全局安装Vercel CLI
+      - name: Install Vercel CLI
         run: npm install -g vercel
-      - name: Deploy to Vercel retry up to 3 times
+
+      # 部署到Vercel，最多重试3次，失败等待15秒
+      - name: Deploy to Vercel (retry 3 times)
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
@@ -58,8 +84,8 @@ jobs:
               echo "✅ Deploy success"
               exit 0
             fi
-            echo "❌ Attempt $i failed, wait 15s for retry..."
+            echo "❌ Attempt $i failed, wait 15s..."
             sleep 15
           done
-          echo "❌ All 3 deployment attempts failed"
+          echo "❌ All deployment attempts failed"
           exit 1
