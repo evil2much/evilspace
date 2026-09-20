@@ -24,7 +24,7 @@ const createNextConfig = (phase) => {
 
   const nextConfig = {
   // Cloudflare Pages 不支持 standalone，使用默认输出
-  output: isEdgeBuild ? undefined : 'standalone',
+  output:  'standalone',
   eslint: {
     dirs: ['src'],
     // 在生产构建时忽略 ESLint 错误
