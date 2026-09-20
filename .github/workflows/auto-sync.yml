@@ -1,4 +1,6 @@
-name: Auto Sync MoonTVPlus 每6小时自动同步
+
+name: Auto Sync MoonTVPlus
+
 on:
   schedule:
     - cron: '0 */6 * * *'
@@ -10,7 +12,7 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - name: 检出代码
         uses: actions/checkout@v5
@@ -28,34 +30,25 @@ jobs:
           git remote add upstream https://github.com/mtvpls/MoonTVPlus.git || true
           git fetch upstream main
 
-      - name: 验证上游连接
-        run: git ls-remote https://github.com/mtvpls/MoonTVPlus.git HEAD
-
       - name: 合并上游main（保留自身修改）
         run: |
           git checkout main
-          git merge upstream/main --no-edit -X theirs || git merge --abort
+          git merge upstream/main --no-edit -X ours || git merge --abort
 
-      - name: 恢复自身工作流文件
+      - name: 恢复自身配置文件
         run: |
-          git fetch origin main
-          git checkout origin/main -- .github/workflows/auto-sync.yml || true
+          git checkout origin/main -- next.config.js vercel.json .github/workflows/auto-sync.yml 2>/dev/null || true
+          git add next.config.js vercel.json .github/workflows/auto-sync.yml
 
       - name: 清理多余工作流
         run: |
           find .github/workflows -type f ! -name 'auto-sync.yml' -delete 2>/dev/null || true
           git add .
 
-      - name: 安装依赖并验证构建
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.14.0 --activate
-          pnpm install --frozen-lockfile
-          timeout 120 pnpm run build
-
       - name: 提交变更
         run: |
           git commit -m "sync upstream source" || echo "No changes to commit"
 
       - name: 推送
-        run: git push origin main --force-with-lease
+        run: |
+          git push origin main --force-with-lease
