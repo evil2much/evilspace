@@ -1,5 +1,4 @@
-
-name: Auto Sync MoonTVPlus
+name: Auto Sync MoonTVPlus 每6小时自动同步
 
 on:
   schedule:
@@ -12,7 +11,7 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: 检出代码
         uses: actions/checkout@v5
@@ -25,30 +24,35 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: 添加上游并拉取
+      - name: 添加上游并拉取全量代码
         run: |
           git remote add upstream https://github.com/mtvpls/MoonTVPlus.git || true
           git fetch upstream main
 
-      - name: 合并上游main（保留自身修改）
+      - name: 合并上游 main（保留自身修改）
         run: |
-          git checkout main
-          git merge upstream/main --no-edit -X ours || git merge --abort
+          git merge upstream/main --no-edit -X ours || true
+          # 显式恢复自己的配置文件，确保不被上游覆盖
+          git checkout origin/main -- .github/workflows/auto-sync.yml 2>/dev/null || true
+          git checkout origin/main -- next.config.js 2>/dev/null || true
+          git checkout origin/main -- vercel.json 2>/dev/null || true
+          git add .
+          git commit -m "sync upstream (merge)" || echo "No changes to commit"
 
-      - name: 恢复自身配置文件
-        run: |
-          git checkout origin/main -- next.config.js vercel.json .github/workflows/auto-sync.yml 2>/dev/null || true
-          git add next.config.js vercel.json .github/workflows/auto-sync.yml
-
-      - name: 清理多余工作流
+      - name: 清理多余工作流文件
         run: |
           find .github/workflows -type f ! -name 'auto-sync.yml' -delete 2>/dev/null || true
           git add .
+          git commit -m "clean extra workflows" || echo "No changes"
 
-      - name: 提交变更
-        run: |
-          git commit -m "sync upstream source" || echo "No changes to commit"
-
-      - name: 推送
+      - name: 推送到远程
         run: |
           git push origin main --force-with-lease
+
+      - name: 触发Vercel部署Hook
+        if: success()
+        run: |
+          curl -X POST \
+            --max-time 30 \
+            --retry 2 \
+            "https://api.vercel.com/v1/integrations/deploy/prj_qvkM9wqMZ3yjqodv2hZnoiqsqAJd/Ax6VpFiTwJ"
