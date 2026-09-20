@@ -1,3 +1,4 @@
+
 name: Auto Sync MoonTVPlus 每6小时自动同步
 
 on:
@@ -10,8 +11,8 @@ permissions:
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: 检出代码
         uses: actions/checkout@v5
@@ -32,10 +33,8 @@ jobs:
       - name: 合并上游 main（保留自身修改）
         run: |
           git merge upstream/main --no-edit -X ours || true
-          # 显式恢复自己的配置文件，确保不被上游覆盖
+          # 显式恢复自身配置文件，确保不被上游覆盖
           git checkout origin/main -- .github/workflows/auto-sync.yml 2>/dev/null || true
-          git checkout origin/main -- next.config.js 2>/dev/null || true
-          git checkout origin/main -- vercel.json 2>/dev/null || true
           git add .
           git commit -m "sync upstream (merge)" || echo "No changes to commit"
 
@@ -46,8 +45,11 @@ jobs:
           git commit -m "clean extra workflows" || echo "No changes"
 
       - name: 推送到远程
-        run: |
-          git push origin main --force-with-lease
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: main
+          force: true
 
       - name: 触发Vercel部署Hook
         if: success()
@@ -56,3 +58,4 @@ jobs:
             --max-time 30 \
             --retry 2 \
             "https://api.vercel.com/v1/integrations/deploy/prj_qvkM9wqMZ3yjqodv2hZnoiqsqAJd/Ax6VpFiTwJ"
+        continue-on-error: true
