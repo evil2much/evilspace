@@ -1,0 +1,84 @@
+
+name: Auto Sync MoonTVPlus 每6小时自动同步
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+# 移除了 FORCE_JAVASCRIPT_ACTIONS_TO_NODE24，这不是标准 GitHub Actions 环境变量
+# 如需指定 Node 版本，请使用 actions/setup-node
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: 配置Git身份
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: 添加上游并拉取全量代码
+        run: |
+          git remote add upstream https://github.com/mtvpls/MoonTVPlus.git || true
+          git fetch upstream main
+
+      # 验证上游仓库可达
+      - name: 验证上游连接
+        run: |
+          echo "检查上游分支是否存在..."
+          git ls-remote --heads upstream main
+          echo "上游连接正常"
+
+      # 1. 本地强制完全同步为上游最新，清除所有本地差异/冲突
+      - name: 硬重置到上游main
+        run: |
+          git reset --hard upstream/main
+          git clean -fd
+
+      # 2. 先刷新 origin 远程追踪分支，确保 origin/main 引用是最新的
+      - name: 刷新远程引用
+        run: |
+          git fetch origin --prune || true
+
+      # 3. 恢复你自己的同步脚本，避免被重置删除
+      - name: 恢复auto-sync.yml
+        run: |
+          git checkout origin/main -- .github/workflows/auto-sync.yml || true
+
+      # 4. 清理所有外来 workflow 文件，只保留自身脚本
+      - name: 过滤多余工作流
+        run: |
+          find .github/workflows -type f ! -name 'auto-sync.yml' -delete 2>/dev/null || true
+          git add .
+
+      # 5. 提交变更
+      - name: 提交本地修改
+        run: |
+          git commit -m "sync upstream source" || echo "No changes to commit"
+
+      # 6. 强制推送，解决 non-fast-forward 分支落后报错
+      - name: 强制推送到远程
+        run: |
+          git push origin main --force
+
+      # 兜底触发Vercel部署Hook
+      - name: 触发Vercel部署Hook
+        if: success()
+        run: |
+          echo "正在触发Vercel部署..."
+          curl -f -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            "https://api.vercel.com/v1/integrations/deploy/prj_qvkM9wqMZ3yjqodv2hZnoiqsqAJd/Ax6VpFiTwJ" \
+            --max-time 30 \
+            --retry 2 \
+            --retry-delay 5 || echo "Vercel部署触发失败，请检查Vercel项目配置"
+          echo "Vercel部署触发完成"
