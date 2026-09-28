@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: write
-  workflows: write  # 兜底权限，防止上游新增 workflow 文件导致推送被拒
+  workflows: write
 
 jobs:
   sync:
