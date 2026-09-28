@@ -29,23 +29,30 @@ jobs:
           git remote add upstream https://github.com/mtvpls/MoonTVPlus.git || true
           git fetch upstream main
 
-      - name: 合并上游 main（保留自身修改）
+      - name: 合并上游 main（排除 workflow 目录）
         run: |
-          git merge upstream/main --no-edit -X ours || true
+          # 记录本地 workflow 目录快照，供合并后回退
+          cp -r .github/workflows /tmp/workflows_backup 2>/dev/null || true
+          git merge upstream/main --no-commit --no-edit -X ours || true
+          # 关键：把 workflow 目录整体回退到合并前状态，避免上游新增文件进入本次提交
+          rm -rf .github/workflows
+          cp -r /tmp/workflows_backup .github/workflows 2>/dev/null || mkdir -p .github/workflows
+          git add -A .github/workflows
           # 显式恢复自己的配置文件，确保不被上游覆盖
-          git checkout origin/main -- .github/workflows/auto-sync.yml 2>/dev/null || true
           git checkout origin/main -- next.config.js 2>/dev/null || true
           git checkout origin/main -- vercel.json 2>/dev/null || true
-          git commit -am "fix: preserve local configuration files" || true
+          git add -A
+          git commit -m "chore: sync upstream, exclude workflow dir" || true
 
-      - name: 清理上游多余的 workflow 文件
+      - name: 校验 workflow 目录无上游变更
         run: |
-          # 只删除 .github/workflows/ 目录下的文件，不动其他 .github 内容
-          if [ -d .github/workflows ]; then
-            git rm -rf .github/workflows 2>/dev/null || true
-            rm -rf .github/workflows
-            mkdir -p .github/workflows
+          # 若检测到除 auto-sync.yml 外的文件，直接终止，避免推送被拒
+          EXTRA=$(ls .github/workflows 2>/dev/null | grep -v '^auto-sync.yml$' || true)
+          if [ -n "$EXTRA" ]; then
+            echo "检测到非预期 workflow 文件: $EXTRA"
+            exit 1
           fi
+          echo "workflow 目录校验通过"
 
       - name: 推送代码到主分支
         uses: ad-m/github-push-action@master
