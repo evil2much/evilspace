@@ -1,12 +1,13 @@
-name: Auto Sync MoonTVPlus 每6小时自动同步
+name: Auto Sync MoonTVPlus 每12小时自动同步
 
 on:
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 10,22 * * *'  # 北京时间 18:00 和次日 06:00
   workflow_dispatch:
 
 permissions:
   contents: write
+  workflows: write  # 兜底权限，防止上游新增 workflow 文件导致推送被拒
 
 jobs:
   sync:
@@ -38,9 +39,14 @@ jobs:
           git checkout origin/main -- vercel.json 2>/dev/null || true
           git commit -am "fix: preserve local configuration files" || true
 
-      - name: 清理多余工作流文件
+      - name: 清理上游多余的 workflow 文件
         run: |
-          find .github/workflows -type f ! -name 'auto-sync.yml' -delete 2>/dev/null || true
+          # 只删除 .github/workflows/ 目录下的文件，不动其他 .github 内容
+          if [ -d .github/workflows ]; then
+            git rm -rf .github/workflows 2>/dev/null || true
+            rm -rf .github/workflows
+            mkdir -p .github/workflows
+          fi
 
       - name: 推送代码到主分支
         uses: ad-m/github-push-action@master
